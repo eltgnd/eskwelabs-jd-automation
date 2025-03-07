@@ -78,6 +78,13 @@ def extract_id(google_drive_link: str):
     '''
     return google_drive_link.split('/')[-1].split('?')[0]
 
+def get_input_documents(google_drive_id):
+    '''
+    Open the Google Drive folder and extract each document object, outputted as a dictionary
+    '''
+    
+    return ''
+
 def extract_text(doc):
     '''
     Extract a document's text, where the document can be a pdf or a docx file
