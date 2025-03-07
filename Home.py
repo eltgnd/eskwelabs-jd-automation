@@ -143,7 +143,7 @@ def main():
     if 'submitted' not in st.session_state:
         st.session_state.submitted = False
 
-    st.title("Eskwelabs End of Bootcamp Analysis Report Generator")
+    st.title(page_title)
     st.info('For Google Driver folder links, ensure that anyone can view the folder.', icon='ℹ️')
 
     # User input
