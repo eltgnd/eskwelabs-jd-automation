@@ -142,6 +142,28 @@ def upload_doc(doc, target_id):
 
     return ''
 
+def is_token_within_limit(text):
+    '''
+    Checks if the input text is within the context limit of the used OpenAI LLM
+    '''
+
+    return True
+
+def get_output():
+    '''
+    Make the API call to OpenAI
+    '''
+
+    return ''
+
+def get_output_link(folder_id):
+    '''
+    Returns a hyperlink that leads to the Google Drive folder
+    '''
+
+    return f'https://drive.google.com/drive/folders/{folder_id}?usp=drive_link'
+
+
 ##### Initialize
 st.set_page_config(page_title=page_title, layout="centered", initial_sidebar_state="auto", menu_items=None)
 
@@ -222,7 +244,7 @@ def main():
                     upload_doc(doc, ss['output_id'])
                 
                 st.success('Automation completed!')
-                output_link = get_output_link(folder_id)
+                output_link = get_output_link(ss['output_id'])
                 st.link_button('View folder', output_link)
 
 if __name__ == "__main__":
