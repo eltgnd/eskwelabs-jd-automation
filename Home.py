@@ -186,7 +186,7 @@ def main():
 
 
             # Collect methodology docs
-            ref_documents = get_input_documents(ss['ref_folder'])
+            ref_documents = get_input_documents(ss['ref_id'])
             for doc in ref_documents:
                 extracted_text = extract_text(doc)
                 cleaned_text = clean_text(extracted_text)
@@ -195,7 +195,7 @@ def main():
                 ss['jd'].append(cleaned_text)
 
             # Collect input JDs
-            input_documents = get_input_documents(ss['input_folder'])
+            input_documents = get_input_documents(ss['input_id'])
             for doc in input_documents:
                 extracted_text = extract_text(doc)
                 cleaned_text = clean_text(extracted_text)
