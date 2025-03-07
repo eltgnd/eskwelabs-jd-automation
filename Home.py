@@ -16,7 +16,7 @@ page_title = 'Eskwelabs AI-Augmented Job Description Transformer'
 SCOPES = ['https://www.googleapis.com/auth/presentations', 'https://www.googleapis.com/auth/drive']
 ss = st.session_state
 ss['gpt_model'] = '4o_mini'
-ss['prompt_instruction'] = user_dict[user_dict['prompt_instruction']]
+ss['prompt_instruction'] = user_dict['prompt_instruction']
 
 
 ##### Callable
