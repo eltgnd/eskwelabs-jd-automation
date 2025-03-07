@@ -114,7 +114,7 @@ def process_text(str):
 
     return ''
 
-def get_prompt(prompt_instruction=ss['prompt_instruction'], jds=ss['jd'], refs=ss['ref']):
+def get_prompt(jds, refs, prompt_instruction=ss['prompt_instruction']):
     '''
     Combines the prompt instruction, processed JDs, and processed reference materials
     '''
@@ -126,17 +126,17 @@ def create_doc_from_text(text):
     Creates a docx file containing the inputted text
     '''
 
-    pass
+    return ''
 
-def upload_doc(doc, target_id=ss['output_id']):
+def upload_doc(doc, target_id):
     '''
     Uploads the input doc into the Google Drive folder id
     '''
 
-    pass
+    return ''
 
 ##### Initialize
-st.set_page_config(page_title=page_title, page_icon=page_icon, layout="centered", initial_sidebar_state="auto", menu_items=None)
+st.set_page_config(page_title=page_title, layout="centered", initial_sidebar_state="auto", menu_items=None)
 
 def main():
 
@@ -197,7 +197,7 @@ def main():
                 ss['ref'].append(extracted_text)
 
             # Get prompt
-            ss['prompt'] = get_prompt()
+            ss['prompt'] = get_prompt(ss['jd'], ss['ref'])
 
             # Get output
             if is_token_within_limit(ss['prompt']):
@@ -212,7 +212,7 @@ def main():
             if ss['is_output_processed']:
                 for text in ss['output']:
                     doc = create_doc_from_text(text)
-                    upload_doc(doc)
+                    upload_doc(doc, ss['output_id'])
                 
                 st.success('Automation completed!')
                 output_link = get_output_link(folder_id)
@@ -221,4 +221,4 @@ def main():
 # if __name__ == "__main__":
 #     main()
 
-st.write('test')
+print('done')
