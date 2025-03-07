@@ -218,7 +218,5 @@ def main():
                 output_link = get_output_link(folder_id)
                 st.link_button('View folder', output_link)
 
-# if __name__ == "__main__":
-#     main()
-
-print('done')
+if __name__ == "__main__":
+    main()
