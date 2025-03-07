@@ -1,1 +1,6 @@
-user_dict = '''hi'''
+user_dict = {
+
+    'prompt_instruction' : 'hi'
+
+
+}

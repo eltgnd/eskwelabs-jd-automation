@@ -8,6 +8,7 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 import openai
 
+from user_editable import user_dict
 
 ##### Variables
 testing_phase = True
@@ -15,10 +16,7 @@ page_title = 'Eskwelabs AI-Augmented Job Description Transformer'
 SCOPES = ['https://www.googleapis.com/auth/presentations', 'https://www.googleapis.com/auth/drive']
 ss = st.session_state
 ss['gpt_model'] = '4o_mini'
-
-
-##### Imports
-from user_editable import user_dict
+ss['prompt_instruction'] = user_dict[user_dict['prompt_instruction']]
 
 
 ##### Callable
@@ -220,5 +218,7 @@ def main():
                 output_link = get_output_link(folder_id)
                 st.link_button('View folder', output_link)
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()
+
+st.write('test')
