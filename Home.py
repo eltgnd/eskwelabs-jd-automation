@@ -162,9 +162,6 @@ def main():
         # Authenticate with Google
         creds = authenticate_google()
 
-        # Display documents and token count
-
-
         # Submit auth
         if st.button('Start Automation'):
             
@@ -223,8 +220,5 @@ def main():
                 output_link = get_output_link(folder_id)
                 st.link_button('View folder', output_link)
 
-
-
-            
-            
-            
+if __name__ == "__main__":
+    main()
