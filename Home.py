@@ -222,14 +222,13 @@ def create_google_doc(doc_title, content):
     }
     file = drive_service.files().create(body=file_metadata, fields="id").execute()
     doc_id = file.get("id")
-
-    content = re.sub(r"\*\*(.*?)\*\*", r"\1", content)
-    lines = content.split("\n")
+    font = user_dict['font']
+    
+    clean_content = re.sub(r"\*\*(.*?)\*\*", r"\1", content)
+    lines = clean_content.split("\n")
     requests = []
 
     index = 1
-
-    font = user_dict['font']
     
     for i, line in enumerate(lines):
         requests.append({
@@ -258,25 +257,7 @@ def create_google_doc(doc_title, content):
                 }
             })
         
-        requests.append({
-            "updateTextStyle": {
-                "range": {"startIndex": index, "endIndex": end_index},
-                "textStyle": {"weightedFontFamily": {"fontFamily": font}},
-                "fields": "weightedFontFamily"
-            }
-        })
-        
         index = end_index
-    
-    bold_matches = [(m.start(), m.end()) for m in re.finditer(r"\*\*(.*?)\*\*", content)]
-    for start, end in bold_matches:
-        requests.append({
-            "updateTextStyle": {
-                "range": {"startIndex": start, "endIndex": end},
-                "textStyle": {"bold": True},
-                "fields": "bold"
-            }
-        })
     
     docs_service.documents().batchUpdate(documentId=doc_id, body={"requests": requests}).execute()
 
@@ -362,7 +343,7 @@ def main():
                 ss['ref'] = []
 
                 
-                st.write('Collecting methodology document/s...')
+                st.write('Collecting methodology documents...')
                 # Collect methodology docs
                 ref_documents = get_input_documents(ss['ref_id'])
                 for doc in ref_documents:
@@ -370,7 +351,7 @@ def main():
                     cleaned_text = clean_text(extracted_text)
                     ss['jd'].append(cleaned_text)
 
-                st.write('Collecting JD document/s...')
+                st.write('Collecting JD documents...')
                 # Collect input JDs
                 input_documents = get_input_documents(ss['input_id'])
                 for doc in input_documents:
@@ -384,7 +365,7 @@ def main():
                 ss['prompt'] = get_prompt(ss['jd'], ss['ref'])
                 
 
-                st.write('Processing the prompt...')
+                st.write('Calling the API...')
                 # Get output
                 if is_token_within_limit(ss['prompt']):
                     ss['output'] = get_output(ss['prompt'])
@@ -396,10 +377,10 @@ def main():
                 st.write('Uploading new JDs...')
                 # Prepare output
                 if ss['is_output_processed']:
-                    input_document_titles = [i['name'].split('.')[0] for i in input_documents]
-                    for i in range(len(ss['output'])):
-                        create_google_doc(input_document_titles[i], ss['output'][i])
-                    
+                    for output in ss['output']:
+                        title = output.split('\n')[0]
+                        create_google_doc(title, output)
+
             st.success('Automation completed!')
             output_link = get_output_link(ss['output_id'])
             st.link_button('View folder', output_link)
