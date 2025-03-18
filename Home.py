@@ -19,7 +19,6 @@ import tiktoken
 from user_editable import user_dict
 
 ##### Variables
-testing_phase = True
 page_title = 'Eskwelabs AI-Augmented Job Description Transformer'
 SCOPES = ['https://www.googleapis.com/auth/presentations', 'https://www.googleapis.com/auth/drive']
 ss = st.session_state
@@ -305,6 +304,8 @@ def main():
 
     st.title(page_title)
     st.info('For Google Driver folder links, ensure that anyone can view the folder.', icon='ℹ️')
+
+    testing_phase = st.toggle('Prototype Mode', help='Turning this on means using test inputs and reference materials. Otherwise, input your own Google Drive folders and documents.')
 
     # User input
     with st.form('slide_info_form'):
