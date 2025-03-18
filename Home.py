@@ -1,12 +1,20 @@
 # Packages
 import streamlit as st
 import json
+import os
+import docx
+import pdfplumber
+import re
+import io
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
+from googleapiclient.http import MediaIoBaseDownload
+
 import openai
+import tiktoken
 
 from user_editable import user_dict
 
@@ -15,9 +23,7 @@ testing_phase = True
 page_title = 'Eskwelabs AI-Augmented Job Description Transformer'
 SCOPES = ['https://www.googleapis.com/auth/presentations', 'https://www.googleapis.com/auth/drive']
 ss = st.session_state
-ss['gpt_model'] = '4o_mini'
-ss['prompt_instruction'] = user_dict['prompt_instruction']
-
+ss['creds'] = ''
 
 ##### Callable
 def authenticate_google():
@@ -78,89 +84,233 @@ def extract_id(google_drive_link: str):
     '''
     return google_drive_link.split('/')[-1].split('?')[0]
 
+def get_document_type(doc):
+    '''
+    Determine if the passed in object is a docx or pdf file
+    '''
+    if doc['mimeType'] == 'application/pdf':
+        return 'pdf'
+    else:
+        return 'docx'
+
 def get_input_documents(google_drive_id):
     '''
-    Open the Google Drive folder and extract each document object, outputted as a dictionary
+    Open the Google Drive folder and extract each document/pdf file, output metadata as a dictionary
     '''
+    service = build('drive', 'v3', credentials=ss['creds'])
+    query = f"'{google_drive_id}' in parents"
+    results = service.files().list(q=query).execute()
+    return results.get('files', [])
+
+def extract_docx_text(doc):
+    '''
+    Extract a docx file's text content
+    '''
+    docs_service = build('docs', 'v1', credentials=ss['creds'])
+
+    # Get the document content
+    document = docs_service.documents().get(documentId=doc['id']).execute()
+
+    # Extract text from document structure
+    text = ""
+    for element in document.get("body", {}).get("content", []):
+        if "paragraph" in element:
+            for run in element["paragraph"].get("elements", []):
+                if "textRun" in run:
+                    text += run["textRun"]["content"]
+
+    return text.strip()
+
+def download_pdf_file(doc):
+    '''
+    Download a pdf file given its file id from Google Drive
+    '''
+    service = build('drive', 'v3', credentials=ss['creds'])
+    request = service.files().get_media(fileId=doc['id'])
+    file_stream = io.BytesIO()
+    downloader = MediaIoBaseDownload(file_stream, request)
+    done = False
+    while not done:
+        _, done = downloader.next_chunk()
     
-    return ''
+    output_path = f"downloaded_files/{doc['name']}"
+    with open(output_path, "wb") as f:
+        f.write(file_stream.getvalue())
+
+    return output_path
+
+def extract_pdf_text(pdf_path):
+    '''
+    Extracts text from a PDF file stored locally
+    '''
+    with pdfplumber.open(pdf_path) as pdf:
+        return "\n".join([page.extract_text() for page in pdf.pages if page.extract_text()])
 
 def extract_text(doc):
     '''
-    Extract a document's text, where the document can be a pdf or a docx file
+    Extract a document's text, where the document is a dictionary containing information about the Google Drive file.
+    '''
+    doc_type = doc['mimeType']
+    
+    if doc_type == 'application/pdf':
+        output_path = download_pdf_file(doc) # Save the PDF file locally
+        return extract_pdf_text(output_path)
+    
+    else:
+        return extract_docx_text(doc)
+
+def clean_text(text):
+    '''
+    Cleans a string by removing irrelevant strings
     '''
 
-    doc_type = get_document_type(doc)
+    # Removes strings of the form "X of 8 3/6/2025, 9:16 AM" found in downloaded PDF files
+    # - `\d+ of 8` matches the page number format (X of 8)
+    # - `\s+\d{1,2}/\d{1,2}/\d{4}, \d{1,2}:\d{2} (AM|PM)` matches the date and time
+    pattern = r"\d+ of 8\s+\d{1,2}/\d{1,2}/\d{4}, \d{1,2}:\d{2} (AM|PM)"
+    cleaned_text = re.sub(pattern, "\n", text)
 
-    def extract_docx_text(doc):
-        return ''
+    # Removes new lines
+    # cleaned_text = re.sub(r'\s+', ' ', cleaned_text).strip()
 
-    def extract_pdf_text(doc):
-        return ''        
+    return cleaned_text
 
-
-    if doc_type == 'docx':
-        extracted_text = extract_docx_text(doc)
-        
-    if doc_type == 'pdf':
-        extracted_text = extract_pdf_text(doc)
-
-    return extracted_text
-
-def clean_text(str):
-    '''
-    Cleans a string by removing whitespace
-    '''
-
-    return ''
-
-def process_text(str):
-    '''
-    Trims a string by removing unnecessary text using NLP
-    '''
-
-    return ''
-
-def get_prompt(jds, refs, prompt_instruction=ss['prompt_instruction']):
+def get_prompt(refs, jds, prompt_instruction=user_dict['prompt_instruction']):
     '''
     Combines the prompt instruction, processed JDs, and processed reference materials
     '''
+    prompt = prompt_instruction
+    for ind, ref in enumerate(refs):
+        prompt += f'\n### REFERENCE MATERIAL {ind+1} ###\n{ref}'
+    for ind, jd in enumerate(jds):
+        prompt += f'\n### JOB DESCRIPTION {ind+1} ###\n{jd}'
 
-    return ''
+    return prompt
     
-def create_doc_from_text(text):
-    '''
-    Creates a docx file containing the inputted text
-    '''
+# def create_doc_from_text(text, title):
+#     '''
+#     Creates a docx file containing the inputted text
+#     '''
+#     doc = docx.Document()
+#     doc.add_paragraph(text)
+#     file_path = f"output_files/{title} (AI-Augmented).docx"
+#     doc.save(file_path)
+#     return file_path
 
-    return ''
+# def upload_doc(doc, target_id):
+#     '''
+#     Uploads the input doc into the Google Drive folder id
+#     '''
+#     service = build('drive', 'v3', credentials=ss['creds'])
+#     file_metadata = {'name': os.path.basename(doc), 'parents': [target_id]}
+#     media = MediaFileUpload(doc, mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+#     service.files().create(body=file_metadata, media_body=media).execute()
 
-def upload_doc(doc, target_id):
-    '''
-    Uploads the input doc into the Google Drive folder id
-    '''
+def create_google_doc(doc_title, content):
+    """
+    Create a Google Document inside a given folder and insert text.
+    """
 
-    return ''
+    drive_service = build("drive", "v3", credentials=ss['creds'])
+    docs_service = build("docs", "v1", credentials=ss['creds'])
+
+    # Create a new Google Doc inside the folder
+    file_metadata = {
+        "name": f'{doc_title} (AI-Augmented)',
+        "mimeType": "application/vnd.google-apps.document",
+        "parents": [ss['output_id']]
+    }
+    file = drive_service.files().create(body=file_metadata, fields="id").execute()
+    doc_id = file.get("id")
+
+    content = re.sub(r"\*\*(.*?)\*\*", r"\1", content)
+    lines = content.split("\n")
+    requests = []
+
+    index = 1
+
+    font = user_dict['font']
+    
+    for i, line in enumerate(lines):
+        requests.append({
+            "insertText": {
+                "location": {"index": index},
+                "text": line + "\n"
+            }
+        })
+        
+        end_index = index + len(line) + 1
+        
+        if i == 0:
+            requests.append({
+                "updateParagraphStyle": {
+                    "range": {"startIndex": index, "endIndex": end_index},
+                    "paragraphStyle": {"namedStyleType": "HEADING_1"},
+                    "fields": "namedStyleType"
+                }
+            })
+        elif len(line.split()) < 5 and ":" in line:
+            requests.append({
+                "updateParagraphStyle": {
+                    "range": {"startIndex": index, "endIndex": end_index},
+                    "paragraphStyle": {"namedStyleType": "HEADING_2"},
+                    "fields": "namedStyleType"
+                }
+            })
+        
+        requests.append({
+            "updateTextStyle": {
+                "range": {"startIndex": index, "endIndex": end_index},
+                "textStyle": {"weightedFontFamily": {"fontFamily": font}},
+                "fields": "weightedFontFamily"
+            }
+        })
+        
+        index = end_index
+    
+    bold_matches = [(m.start(), m.end()) for m in re.finditer(r"\*\*(.*?)\*\*", content)]
+    for start, end in bold_matches:
+        requests.append({
+            "updateTextStyle": {
+                "range": {"startIndex": start, "endIndex": end},
+                "textStyle": {"bold": True},
+                "fields": "bold"
+            }
+        })
+    
+    docs_service.documents().batchUpdate(documentId=doc_id, body={"requests": requests}).execute()
 
 def is_token_within_limit(text):
     '''
     Checks if the input text is within the context limit of the used OpenAI LLM
     '''
+    encoder = tiktoken.encoding_for_model('gpt-4o')  # Using GPT-4o tokenizer
+    tokens = encoder.encode(text)
 
-    return True
+    return len(tokens) <= user_dict['gpt_input_limit']
 
-def get_output():
+def get_output(prompt):
     '''
     Make the API call to OpenAI
     '''
 
-    return ''
+    client = openai.OpenAI(api_key = ss['api_key'])
+    response = client.chat.completions.create(
+        model = user_dict['gpt_model'],
+        messages = [
+            {"role": "system", "content": "You are an NLP and data visualization expert analyzing qualitative survey feedback."},
+            {"role": "user", "content": prompt}
+        ],
+        temperature=0.3,
+    )
+
+    response_text = response.choices[0].message.content
+    return [i.strip() for i in response_text.split('[DIVIDER]')]
 
 def get_output_link(folder_id):
     '''
     Returns a hyperlink that leads to the Google Drive folder
     '''
-
     return f'https://drive.google.com/drive/folders/{folder_id}?usp=drive_link'
 
 
@@ -169,8 +319,8 @@ st.set_page_config(page_title=page_title, layout="centered", initial_sidebar_sta
 
 def main():
 
-    if 'submitted' not in st.session_state:
-        st.session_state.submitted = False
+    if 'submitted' not in ss:
+        ss['submitted'] = False
 
     st.title(page_title)
     st.info('For Google Driver folder links, ensure that anyone can view the folder.', icon='ℹ️')
@@ -184,68 +334,75 @@ def main():
         submitted = st.form_submit_button('Submit', on_click=submitted_done)
 
 
-    if st.session_state.submitted:
+    if ss['submitted']:
 
         # Authenticate with Google
-        creds = authenticate_google()
-
+        ss['creds'] = authenticate_google()
+   
         # Submit auth
         if st.button('Start Automation'):
             
-            # Set global variables
-            ss['api_key'] = st.secrets['testing']['api_key'] if testing_phase else user_key
-
-            ids = {'input_id':input_folder, 'ref_id':ref_folder, 'output_id':output_folder}
-            if testing_phase:
-                for var_name in ids.keys():
-                    ss[var_name] = extract_id(st.secrets['testing'][var_name])
-            else:
-                for var, var_name in enumerate(ids):
-                    ss[var_name] = extract_id(var)
-
-            ss['jd'] = []
-            ss['ref'] = []
-
-
-            # Collect methodology docs
-            ref_documents = get_input_documents(ss['ref_id'])
-            for doc in ref_documents:
-                extracted_text = extract_text(doc)
-                cleaned_text = clean_text(extracted_text)
-                final_text = process_text(cleaned_text)
-
-                ss['jd'].append(cleaned_text)
-
-            # Collect input JDs
-            input_documents = get_input_documents(ss['input_id'])
-            for doc in input_documents:
-                extracted_text = extract_text(doc)
-                cleaned_text = clean_text(extracted_text)
-                final_text = process_text(cleaned_text)
-
-                ss['ref'].append(extracted_text)
-
-            # Get prompt
-            ss['prompt'] = get_prompt(ss['jd'], ss['ref'])
-
-            # Get output
-            if is_token_within_limit(ss['prompt']):
-                ss['output'] = get_output()
-                ss['is_output_processed'] = True
-            else:
-                st.warning('Token limit exceeded. Please temporarily remove JD documents to minimize text')
-                ss['is_output_processed'] = False
-
-
-            # Prepare output
-            if ss['is_output_processed']:
-                for text in ss['output']:
-                    doc = create_doc_from_text(text)
-                    upload_doc(doc, ss['output_id'])
+            with st.status('Running'):
                 
-                st.success('Automation completed!')
-                output_link = get_output_link(ss['output_id'])
-                st.link_button('View folder', output_link)
+                st.write('Setting up...')
+                # Set global variables
+                # ss['api_key'] = st.secrets['testing']['api_key'] if testing_phase else user_key
+                ss['api_key'] = user_key
+
+                ids = {'input_id':input_folder, 'ref_id':ref_folder, 'output_id':output_folder}
+                if testing_phase:
+                    for var_name in ids.keys():
+                        ss[var_name] = extract_id(st.secrets['testing'][var_name])
+                else:
+                    for var, var_name in enumerate(ids):
+                        ss[var_name] = extract_id(var)
+
+                # Instantiate to append documents from 
+                ss['jd'] = []
+                ss['ref'] = []
+
+                
+                st.write('Collecting methodology document/s...')
+                # Collect methodology docs
+                ref_documents = get_input_documents(ss['ref_id'])
+                for doc in ref_documents:
+                    extracted_text = extract_text(doc)
+                    cleaned_text = clean_text(extracted_text)
+                    ss['jd'].append(cleaned_text)
+
+                st.write('Collecting JD document/s...')
+                # Collect input JDs
+                input_documents = get_input_documents(ss['input_id'])
+                for doc in input_documents:
+                    extracted_text = extract_text(doc)
+                    cleaned_text = clean_text(extracted_text)
+                    ss['ref'].append(cleaned_text)
+
+
+                st.write('Preparing the prompt...')
+                # Get prompt
+                ss['prompt'] = get_prompt(ss['jd'], ss['ref'])
+                
+
+                st.write('Processing the prompt...')
+                # Get output
+                if is_token_within_limit(ss['prompt']):
+                    ss['output'] = get_output(ss['prompt'])
+                    ss['is_output_processed'] = True
+                else:
+                    st.warning('Token limit exceeded. Please remove documents to minimize text')
+                    ss['is_output_processed'] = False
+
+                st.write('Uploading new JDs...')
+                # Prepare output
+                if ss['is_output_processed']:
+                    input_document_titles = [i['name'].split('.')[0] for i in input_documents]
+                    for i in range(len(ss['output'])):
+                        create_google_doc(input_document_titles[i], ss['output'][i])
+                    
+            st.success('Automation completed!')
+            output_link = get_output_link(ss['output_id'])
+            st.link_button('View folder', output_link)
 
 if __name__ == "__main__":
     main()
