@@ -309,7 +309,7 @@ def main():
         input_folder = st.text_input('Google Drive folder link containing JD Documents', help='Ensure that anyone can view the folder')
         ref_folder = st.text_input('Google Drive folder link containing methodology/reference materials', help='Ensure that anyone can view the folder')
         output_folder = st.text_input('Google Drive folder link where new JD documents will be uploaded', help='Ensure that anyone can edit the folder')
-        user_key = st.text_input("ChatGPT API Key")
+        uploaded_api_key_file = st.file_uploader("Text file containing the ChatGPT API Key", type=["txt"], help='The text (.txt) file is assumed to only contain the API key and no other string.')
         submitted = st.form_submit_button('Submit', on_click=submitted_done)
 
 
@@ -326,6 +326,7 @@ def main():
                 st.write('Setting up...')
                 # Set global variables
                 # ss['api_key'] = st.secrets['testing']['api_key'] if testing_phase else user_key
+                user_key = uploaded_api_key_file.read().decode("utf-8").strip()
                 ss['api_key'] = user_key
 
                 ids = {'input_id':input_folder, 'ref_id':ref_folder, 'output_id':output_folder}
@@ -356,7 +357,6 @@ def main():
                     extracted_text = extract_text(doc)
                     cleaned_text = clean_text(extracted_text)
                     ss['ref'].append(cleaned_text)
-
 
                 st.write('Preparing the prompt...')
                 # Get prompt
