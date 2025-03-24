@@ -21,6 +21,9 @@ SCOPES = ['https://www.googleapis.com/auth/presentations', 'https://www.googleap
 ss = st.session_state
 ss['creds'] = ''
 
+##### Initialize
+st.set_page_config(page_title=page_title, layout="centered", initial_sidebar_state="auto", menu_items=None)
+
 ##### Callable
 def authenticate_google():
     '''
@@ -182,25 +185,6 @@ def get_prompt(refs, jds, prompt_instruction=user_dict['prompt_instruction']):
         prompt += f'\n### JOB DESCRIPTION {ind+1} ###\n{jd}'
 
     return prompt
-    
-# def create_doc_from_text(text, title):
-#     '''
-#     Creates a docx file containing the inputted text
-#     '''
-#     doc = docx.Document()
-#     doc.add_paragraph(text)
-#     file_path = f"output_files/{title} (AI-Augmented).docx"
-#     doc.save(file_path)
-#     return file_path
-
-# def upload_doc(doc, target_id):
-#     '''
-#     Uploads the input doc into the Google Drive folder id
-#     '''
-#     service = build('drive', 'v3', credentials=ss['creds'])
-#     file_metadata = {'name': os.path.basename(doc), 'parents': [target_id]}
-#     media = MediaFileUpload(doc, mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
-#     service.files().create(body=file_metadata, media_body=media).execute()
 
 def create_google_doc(doc_title, content):
     """
@@ -289,10 +273,6 @@ def get_output_link(folder_id):
     Returns a hyperlink that leads to the Google Drive folder
     '''
     return f'https://drive.google.com/drive/folders/{folder_id}?usp=drive_link'
-
-
-##### Initialize
-st.set_page_config(page_title=page_title, layout="centered", initial_sidebar_state="auto", menu_items=None)
 
 def main():
 
